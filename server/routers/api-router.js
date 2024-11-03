@@ -103,7 +103,7 @@ router.all("/api/push/:pushToken", async (request, response) => {
         } else {
             if (bean.status === DOWN && this.resendInterval > 0) {
                 ++bean.downCount;
-                if (bean.downCount >= this.resendInterval) {
+                if (bean.downCount >= this.resendInterval && bean.downCount >= this.failureThreshold) {
                     // Send notification again, because we are still DOWN
                     log.debug("monitor", `[${this.name}] sendNotification again: Down Count: ${bean.downCount} | Resend Interval: ${this.resendInterval}`);
                     await Monitor.sendNotification(isFirstBeat, this, bean);

@@ -807,6 +807,7 @@ let needSetup = false;
                 bean.interval = monitor.interval;
                 bean.retryInterval = monitor.retryInterval;
                 bean.resendInterval = monitor.resendInterval;
+                bean.failureThreshold = monitor.failureThreshold;
                 bean.hostname = monitor.hostname;
                 bean.game = monitor.game;
                 bean.maxretries = monitor.maxretries;

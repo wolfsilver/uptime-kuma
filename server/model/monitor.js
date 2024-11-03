@@ -108,6 +108,7 @@ class Monitor extends BeanModel {
             interval: this.interval,
             retryInterval: this.retryInterval,
             resendInterval: this.resendInterval,
+            failureThreshold: this.failureThreshold,
             keyword: this.keyword,
             invertKeyword: this.isInvertKeyword(),
             expiryNotification: this.isEnabledExpiryNotification(),
@@ -941,7 +942,7 @@ class Monitor extends BeanModel {
 
                 if (bean.status === DOWN && this.resendInterval > 0) {
                     ++bean.downCount;
-                    if (bean.downCount >= this.resendInterval) {
+                    if (bean.downCount >= this.resendInterval && bean.downCount >= this.failureThreshold) {
                         // Send notification again, because we are still DOWN
                         log.debug("monitor", `[${this.name}] sendNotification again: Down Count: ${bean.downCount} | Resend Interval: ${this.resendInterval}`);
                         await Monitor.sendNotification(isFirstBeat, this, bean);
