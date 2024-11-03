@@ -19,6 +19,14 @@
                         </div>
                     </div>
 
+                    <div class="my-3 form-group">
+                        <label for="failure-threshold">{{ $t("Failure Threshold") }}</label>
+                        <input id="failure-threshold" v-model="monitor.failureThreshold" class="form-control" type="number" min="0" />
+                        <div class="form-text">
+                            {{ $t("Number of consecutive failures before sending a notification. Set to 0 to send notification on every failure.") }}
+                        </div>
+                    </div>
+
                     <button
                         class="btn btn-primary btn-add-group me-2"
                         @click="$refs.badgeGeneratorDialog.show(monitor.id, monitor.name)"
@@ -54,6 +62,7 @@ export default {
             monitor: {
                 id: null,
                 name: null,
+                failureThreshold: 0,
             },
         };
     },
@@ -78,6 +87,7 @@ export default {
                 monitor_index: monitor.index,
                 group_index: group.index,
                 isClickAble: this.showLink(monitor),
+                failureThreshold: monitor.element.failureThreshold || 0,
             };
 
             this.MonitorSettingDialog.show();

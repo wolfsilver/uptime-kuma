@@ -155,6 +155,7 @@ class Monitor extends BeanModel {
             snmpVersion: this.snmpVersion,
             rabbitmqNodes: JSON.parse(this.rabbitmqNodes),
             conditions: JSON.parse(this.conditions),
+            failureThreshold: this.failureThreshold,
         };
 
         if (includeSensitiveData) {
@@ -316,7 +317,7 @@ class Monitor extends BeanModel {
      * @returns {boolean} Kafka Producer Allow Auto Topic Creation Enabled?
      */
     getKafkaProducerAllowAutoTopicCreation() {
-        return Boolean(this.kafkaProducerAllowAutoTopicCreation);
+        return Boolean(this.kafkaProducerAllowAutoTopicCreation());
     }
 
     /**
@@ -327,6 +328,7 @@ class Monitor extends BeanModel {
     async start(io) {
         let previousBeat = null;
         let retries = 0;
+        let failureCount = 0;
 
         this.prometheus = new Prometheus(this);
 
@@ -887,6 +889,7 @@ class Monitor extends BeanModel {
                 }
 
                 retries = 0;
+                failureCount = 0;
 
             } catch (error) {
 
@@ -900,6 +903,7 @@ class Monitor extends BeanModel {
                 // Just reset the retries
                 if (this.isUpsideDown() && bean.status === UP) {
                     retries = 0;
+                    failureCount = 0;
 
                 } else if ((this.maxretries > 0) && (retries < this.maxretries)) {
                     retries++;
@@ -907,6 +911,7 @@ class Monitor extends BeanModel {
                 } else {
                     // Continue counting retries during DOWN
                     retries++;
+                    failureCount++;
                 }
             }
 
@@ -1323,27 +1328,39 @@ class Monitor extends BeanModel {
 
             let msg = `[${monitor.name}] [${text}] ${bean.msg}`;
 
-            for (let notification of notificationList) {
-                try {
-                    const heartbeatJSON = bean.toJSON();
-                    const monitorData = [{ id: monitor.id,
-                        active: monitor.active
-                    }];
-                    const preloadData = await Monitor.preparePreloadData(monitorData);
-                    // Prevent if the msg is undefined, notifications such as Discord cannot send out.
-                    if (!heartbeatJSON["msg"]) {
-                        heartbeatJSON["msg"] = "N/A";
+            // Check the count of triggers within the last 5 minutes
+            const triggerCount = await R.count("notification_trigger", "monitor_id = ? AND timestamp > datetime('now', '-5 minutes')", [
+                monitor.id,
+            ]);
+
+            if (triggerCount < 1) {
+                // Insert a new trigger timestamp
+                await R.exec("INSERT INTO notification_trigger (monitor_id, timestamp) VALUES (?, datetime('now'))", [
+                    monitor.id,
+                ]);
+            } else if (triggerCount >= 1) {
+                for (let notification of notificationList) {
+                    try {
+                        const heartbeatJSON = bean.toJSON();
+                        const monitorData = [{ id: monitor.id,
+                            active: monitor.active
+                        }];
+                        const preloadData = await Monitor.preparePreloadData(monitorData);
+                        // Prevent if the msg is undefined, notifications such as Discord cannot send out.
+                        if (!heartbeatJSON["msg"]) {
+                            heartbeatJSON["msg"] = "N/A";
+                        }
+
+                        // Also provide the time in server timezone
+                        heartbeatJSON["timezone"] = await UptimeKumaServer.getInstance().getTimezone();
+                        heartbeatJSON["timezoneOffset"] = UptimeKumaServer.getInstance().getTimezoneOffset();
+                        heartbeatJSON["localDateTime"] = dayjs.utc(heartbeatJSON["time"]).tz(heartbeatJSON["timezone"]).format(SQL_DATETIME_FORMAT);
+
+                        await Notification.send(JSON.parse(notification.config), msg, monitor.toJSON(preloadData, false), heartbeatJSON);
+                    } catch (e) {
+                        log.error("monitor", "Cannot send notification to " + notification.name);
+                        log.error("monitor", e);
                     }
-
-                    // Also provide the time in server timezone
-                    heartbeatJSON["timezone"] = await UptimeKumaServer.getInstance().getTimezone();
-                    heartbeatJSON["timezoneOffset"] = UptimeKumaServer.getInstance().getTimezoneOffset();
-                    heartbeatJSON["localDateTime"] = dayjs.utc(heartbeatJSON["time"]).tz(heartbeatJSON["timezone"]).format(SQL_DATETIME_FORMAT);
-
-                    await Notification.send(JSON.parse(notification.config), msg, monitor.toJSON(preloadData, false), heartbeatJSON);
-                } catch (e) {
-                    log.error("monitor", "Cannot send notification to " + notification.name);
-                    log.error("monitor", e);
                 }
             }
         }
@@ -1561,7 +1578,7 @@ class Monitor extends BeanModel {
                 notificationsMap.get(row.monitor_id)[row.notification_id] = true;
             });
 
-            tags.forEach(row => {
+            tagsMap.forEach(row => {
                 if (!tagsMap.has(row.monitor_id)) {
                     tagsMap.set(row.monitor_id, []);
                 }

@@ -239,6 +239,34 @@ async function sendMonitorTypeList(socket) {
     io.to(socket.userID).emit("monitorTypeList", Object.fromEntries(result));
 }
 
+/**
+ * Send list of monitors to client
+ * @param {Socket} socket Socket.io socket instance
+ * @returns {Promise<Bean[]>} List of monitors
+ */
+async function sendMonitorList(socket) {
+    const timeLogger = new TimeLogger();
+
+    let result = [];
+    let list = await R.find("monitor", " user_id = ? ", [
+        socket.userID,
+    ]);
+
+    for (let bean of list) {
+        let monitorObject = bean.export();
+        monitorObject.isDefault = (monitorObject.isDefault === 1);
+        monitorObject.active = (monitorObject.active === 1);
+        monitorObject.failureThreshold = bean.failureThreshold; // Pa2c6
+        result.push(monitorObject);
+    }
+
+    io.to(socket.userID).emit("monitorList", result);
+
+    timeLogger.print("Send Monitor List");
+
+    return list;
+}
+
 module.exports = {
     sendNotificationList,
     sendImportantHeartbeatList,
@@ -249,4 +277,5 @@ module.exports = {
     sendDockerHostList,
     sendRemoteBrowserList,
     sendMonitorTypeList,
+    sendMonitorList,
 };

@@ -722,6 +722,7 @@ let needSetup = false;
 
                 bean.import(monitor);
                 bean.user_id = socket.userID;
+                bean.failureThreshold = monitor.failureThreshold;
 
                 bean.validate();
 
@@ -874,6 +875,7 @@ let needSetup = false;
                 bean.rabbitmqUsername = monitor.rabbitmqUsername;
                 bean.rabbitmqPassword = monitor.rabbitmqPassword;
                 bean.conditions = JSON.stringify(monitor.conditions);
+                bean.failureThreshold = monitor.failureThreshold;
 
                 bean.validate();
 

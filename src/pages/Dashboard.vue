@@ -32,6 +32,15 @@ export default {
     mounted() {
         this.height = this.$refs.container.offsetHeight;
     },
+    methods: {
+        getMonitorList() {
+            this.$socket.emit("getMonitorList", (response) => {
+                if (response.ok) {
+                    this.$store.commit("setMonitorList", response.monitorList);
+                }
+            });
+        }
+    }
 };
 </script>
 
